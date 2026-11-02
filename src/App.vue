@@ -20,6 +20,34 @@ const mouseY = ref(0);
 const photons = ref<Photon[]>([]);
 const sparks = ref<{ id: number; x: number; y: number; dx: number; dy: number; hue: number }[]>([]);
 
+interface UserInfo { name: string; role: string }
+const currentUser = ref<UserInfo | null>(null);
+const showLogin = ref(false);
+const isSubmitting = ref(false);
+const loginError = ref('');
+const loginForm = ref({ username: '', password: '' });
+
+const openLogin = () => { loginError.value = ''; showLogin.value = true; };
+const closeLogin = () => { showLogin.value = false; };
+const submitLogin = () => {
+  if (!loginForm.value.username.trim() || !loginForm.value.password.trim()) {
+    loginError.value = '请输入账号和密码';
+    return;
+  }
+  isSubmitting.value = true;
+  setTimeout(() => {
+    currentUser.value = { name: loginForm.value.username.trim(), role: '良率工程师' };
+    localStorage.setItem('yms-user', JSON.stringify(currentUser.value));
+    isSubmitting.value = false;
+    showLogin.value = false;
+    loginForm.value = { username: '', password: '' };
+  }, 600);
+};
+const logout = () => {
+  currentUser.value = null;
+  localStorage.removeItem('yms-user');
+};
+
 const loadMarkdown = async (doc: DocItem) => {
   isLoading.value = true;
   currentDoc.value = doc;
@@ -74,6 +102,8 @@ const cleanupSparks = setInterval(() => {
 onMounted(() => {
   loadMarkdown(currentDoc.value);
   initPhotons();
+  const saved = localStorage.getItem('yms-user');
+  if (saved) { try { currentUser.value = JSON.parse(saved); } catch { /* 忽略无效缓存 */ } }
   window.addEventListener('mousemove', onMouseMove, { passive: true });
 });
 
@@ -115,6 +145,17 @@ onBeforeUnmount(() => {
           <div class="stat"><div class="stat-val">PB</div><div class="stat-label">级数据处理</div></div>
         </div>
       </div>
+      <div class="header-actions">
+        <button v-if="!currentUser" class="login-btn" @click="openLogin">⟡ 登录</button>
+        <div v-else class="user-chip">
+          <span class="avatar">{{ currentUser.name.charAt(0).toUpperCase() }}</span>
+          <span class="user-meta">
+            <span class="user-name">{{ currentUser.name }}</span>
+            <span class="user-role">{{ currentUser.role }}</span>
+          </span>
+          <button class="logout-btn" @click="logout">退出</button>
+        </div>
+      </div>
     </header>
 
     <nav class="sidebar">
@@ -137,6 +178,32 @@ onBeforeUnmount(() => {
       </div>
       <div class="content-panel" v-else><MarkdownRenderer :content="markdownContent" /></div>
     </main>
+
+    <div v-if="showLogin" class="login-mask" @click.self="closeLogin">
+      <div class="login-modal">
+        <div class="modal-scan"></div>
+        <div class="modal-head">
+          <span class="modal-badge">SECURE ACCESS</span>
+          <h2>YMS 身份认证</h2>
+          <button class="modal-close" @click="closeLogin">×</button>
+        </div>
+        <form class="login-form" @submit.prevent="submitLogin">
+          <label class="field">
+            <span>账号</span>
+            <input v-model="loginForm.username" placeholder="请输入账号" autocomplete="username" />
+          </label>
+          <label class="field">
+            <span>密码</span>
+            <input type="password" v-model="loginForm.password" placeholder="请输入密码" autocomplete="current-password" />
+          </label>
+          <p v-if="loginError" class="login-error">{{ loginError }}</p>
+          <button class="submit-btn" type="submit" :disabled="isSubmitting">
+            {{ isSubmitting ? '认证中...' : '登 录' }}
+          </button>
+          <p class="login-hint">演示环境：输入任意非空账号密码即可登录</p>
+        </form>
+      </div>
+    </div>
 
     <footer class="footer">
       <div class="footer-inner">
@@ -230,6 +297,40 @@ html, body { font-family: 'SF Mono', 'Consolas', 'Menlo', 'PingFang SC', 'Micros
 .footer-tag { font-family: 'SF Mono',monospace; color: var(--tech-cyan); }
 .footer-time { font-family: 'SF Mono',monospace; color: var(--tech-purple); }
 
+/* ===== 登录入口 ===== */
+.header-actions { position: absolute; top: 1.8rem; right: 2rem; z-index: 3; }
+.login-btn { display: inline-flex; align-items: center; gap: 6px; padding: .55rem 1.3rem; border-radius: 8px; border: 1px solid rgba(0,212,255,.45); background: linear-gradient(135deg, rgba(0,212,255,.18), rgba(124,92,255,.14)); color: var(--tech-cyan); font-size: .88rem; letter-spacing: 1px; font-family: inherit; transition: all .25s ease; box-shadow: 0 0 14px rgba(0,212,255,.18); }
+.login-btn:hover { color: #fff; border-color: var(--tech-cyan); box-shadow: 0 0 22px rgba(34,247,201,.35); transform: translateY(-1px); }
+.user-chip { display: flex; align-items: center; gap: 10px; padding: 6px 12px; border: 1px solid var(--tech-border); border-radius: 22px; background: rgba(10,15,37,.7); backdrop-filter: blur(8px); }
+.avatar { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: .8rem; font-weight: 700; color: #050816; background: linear-gradient(135deg, var(--tech-blue), var(--tech-cyan)); box-shadow: 0 0 10px rgba(0,212,255,.5); }
+.user-meta { display: flex; flex-direction: column; line-height: 1.2; }
+.user-name { font-size: .82rem; color: #e0f2fe; }
+.user-role { font-size: .68rem; color: rgba(180,220,255,.55); letter-spacing: 1px; }
+.logout-btn { padding: .25rem .7rem; border-radius: 6px; border: 1px solid rgba(255,93,122,.4); background: rgba(255,93,122,.08); color: #ff8fa3; font-size: .72rem; font-family: inherit; transition: all .2s ease; }
+.logout-btn:hover { background: rgba(255,93,122,.18); color: #fff; }
+
+.login-mask { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; background: rgba(3,6,18,.72); backdrop-filter: blur(6px); animation: fadeIn .25s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.login-modal { position: relative; width: min(380px, 90vw); padding: 2rem 2.2rem 1.6rem; border-radius: 14px; border: 1px solid rgba(0,212,255,.35); background: linear-gradient(150deg, rgba(12,18,44,.97), rgba(5,8,22,.97)); box-shadow: 0 0 60px rgba(0,212,255,.18), inset 0 1px 0 rgba(255,255,255,.05); overflow: hidden; animation: modalIn .3s ease; }
+@keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+.modal-scan { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, transparent, var(--tech-blue), var(--tech-cyan), transparent); animation: scanLine 3s linear infinite; }
+.modal-head { position: relative; margin-bottom: 1.4rem; }
+.modal-badge { font-size: .66rem; letter-spacing: 2px; color: var(--tech-blue); }
+.modal-head h2 { font-size: 1.25rem; color: #e0f2fe; margin-top: .35rem; letter-spacing: 1px; }
+.modal-close { position: absolute; top: -.4rem; right: -.6rem; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--tech-border); background: transparent; color: rgba(180,220,255,.7); font-size: 1rem; line-height: 1; transition: all .2s ease; }
+.modal-close:hover { color: #fff; border-color: var(--tech-cyan); box-shadow: 0 0 12px rgba(34,247,201,.4); }
+.login-form { display: flex; flex-direction: column; gap: .9rem; }
+.field { display: flex; flex-direction: column; gap: .35rem; }
+.field span { font-size: .74rem; letter-spacing: 1.5px; color: rgba(180,220,255,.6); }
+.field input { padding: .7rem .9rem; border-radius: 8px; border: 1px solid rgba(0,212,255,.25); background: rgba(5,10,25,.85); color: #e0f2fe; font-size: .9rem; font-family: inherit; outline: none; cursor: text !important; transition: all .2s ease; }
+.field input::placeholder { color: rgba(180,220,255,.3); }
+.field input:focus { border-color: var(--tech-cyan); box-shadow: 0 0 0 3px rgba(34,247,201,.12), 0 0 18px rgba(34,247,201,.25); }
+.login-error { font-size: .78rem; color: #ff8fa3; letter-spacing: .5px; }
+.submit-btn { margin-top: .3rem; padding: .75rem; border-radius: 9px; border: 1px solid rgba(34,247,201,.5); background: linear-gradient(135deg, rgba(0,212,255,.9), rgba(34,247,201,.85)); color: #04121a; font-weight: 700; font-size: .92rem; letter-spacing: 3px; font-family: inherit; transition: all .25s ease; box-shadow: 0 0 24px rgba(0,212,255,.3); }
+.submit-btn:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 34px rgba(34,247,201,.45); }
+.submit-btn:disabled { opacity: .6; }
+.login-hint { font-size: .7rem; color: rgba(180,220,255,.4); text-align: center; letter-spacing: .5px; }
+
 @media (min-width: 768px) {
   .app-container { flex-direction: row; flex-wrap: wrap; }
   .header { order: 1; width: 100%; }
@@ -248,5 +349,7 @@ html, body { font-family: 'SF Mono', 'Consolas', 'Menlo', 'PingFang SC', 'Micros
   .header-stats { gap: 1rem; }
   .nav-footer { position: relative; padding: 1rem 1.5rem; }
   .cursor-glow { width: 300px; height: 300px; }
+  .header-actions { top: 1rem; right: 1rem; }
+  .logout-btn { padding: .2rem .5rem; }
 }
 </style>
