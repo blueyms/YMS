@@ -72,6 +72,17 @@ describe('Dashboard.vue', () => {
     clearSpy.mockRestore()
   })
 
+  it('does NOT call clearInterval when refreshTimer is falsy (defensive branch)', () => {
+    // 覆盖 if(refreshTimer) 的 false 分支：setInterval 返回 0 / falsy
+    const setSpy = vi.spyOn(window, 'setInterval').mockImplementation(() => 0 as unknown as ReturnType<typeof setInterval>)
+    const clearSpy = vi.spyOn(window, 'clearInterval')
+    const wrap = mount(Dashboard) // onMounted 执行，refreshTimer = 0（falsy）
+    wrap.unmount()                // onBeforeUnmount 执行，if(0) → false，clearInterval 不应被调
+    expect(clearSpy).not.toHaveBeenCalled()
+    setSpy.mockRestore()
+    clearSpy.mockRestore()
+  })
+
   it('KPI values are formatted as percentages/unit strings', () => {
     const wrap = mount(Dashboard)
     const values = wrap.findAll('.kpi-value').map(el => el.text())

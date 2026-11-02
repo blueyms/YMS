@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { genPath, genArea } from './dashboard.math'
 
 interface Kpi { label: string; value: string; trend: number; unit?: string }
 const kpis = ref<Kpi[]>([
@@ -31,26 +32,6 @@ const waferDefects = ref<DefectPoint[]>(
 )
 
 let refreshTimer: number | undefined
-
-const genPath = (values: number[], min: number, max: number, w: number, h: number) => {
-  const stepX = w / (values.length - 1)
-  const range = max - min || 1
-  return values.map((v, i) => {
-    const x = i * stepX
-    const y = h - ((v - min) / range) * h
-    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`
-  }).join(' ')
-}
-const genArea = (values: number[], min: number, max: number, w: number, h: number) => {
-  const stepX = w / (values.length - 1)
-  const range = max - min || 1
-  const line = values.map((v, i) => {
-    const x = i * stepX
-    const y = h - ((v - min) / range) * h
-    return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`
-  }).join(' ')
-  return `${line} L ${w} ${h} L 0 ${h} Z`
-}
 
 const yieldMax = 100, yieldMin = 93
 const defectMax = 0.9, defectMin = 0.1
