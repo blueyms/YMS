@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { DEMO_SECRET, decodeJwt, isExpired, randomSecret, signJwt, verifyJwt, type DecodedJwt } from '../jwt';
+import { createKeyId, maskSecret, readKeys, removeKey, upsertKey, writeKeys, type KeyItem } from '../keyring';
 
 const secret = ref(DEMO_SECRET);
 const payloadText = ref('');
@@ -14,6 +15,47 @@ const decoded = ref<DecodedJwt | null>(null);
 const parseError = ref('');
 const signatureValid = ref(false);
 const checking = ref(false);
+
+/* —— 密钥管理 —— */
+const keys = ref<KeyItem[]>([]);
+const keyName = ref('');
+const activeKeyId = ref<string | null>(null);
+const keyError = ref('');
+const keyNotice = ref('');
+
+const saveCurrentKey = () => {
+  keyError.value = '';
+  keyNotice.value = '';
+  const name = keyName.value.trim();
+  const value = secret.value.trim();
+  if (!name) { keyError.value = '请输入密钥名称'; return; }
+  if (!value) { keyError.value = '当前密钥为空，无法保存'; return; }
+  const existing = keys.value.find(k => k.name === name);
+  const item: KeyItem = existing
+    ? { ...existing, secret: value, createdAt: Date.now() }
+    : { id: createKeyId(), name, secret: value, createdAt: Date.now() };
+  keys.value = upsertKey(keys.value, item);
+  writeKeys(keys.value, localStorage);
+  activeKeyId.value = item.id;
+  keyName.value = '';
+  keyNotice.value = existing ? `已更新密钥「${name}」` : `已保存密钥「${name}」`;
+  setTimeout(() => (keyNotice.value = ''), 2000);
+};
+
+const applyKey = (item: KeyItem) => {
+  secret.value = item.secret;
+  activeKeyId.value = item.id;
+  keyNotice.value = `已启用密钥「${item.name}」`;
+  setTimeout(() => (keyNotice.value = ''), 2000);
+};
+
+const deleteKey = (item: KeyItem) => {
+  keys.value = removeKey(keys.value, item.id);
+  writeKeys(keys.value, localStorage);
+  if (activeKeyId.value === item.id) activeKeyId.value = null;
+};
+
+const formatKeyTime = (ts: number): string => new Date(ts).toLocaleDateString('zh-CN');
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
@@ -103,6 +145,7 @@ const headerPreview = computed(() => (decoded.value ? JSON.stringify(decoded.val
 
 onMounted(() => {
   fillExample();
+  keys.value = readKeys(localStorage);
   const saved = localStorage.getItem('yms-token');
   if (saved) inputToken.value = saved;
 });
@@ -212,6 +255,37 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <div class="jwt-card key-card">
+      <div class="card-title">③ 密钥管理<span class="card-tag">本地存储 · {{ keys.length }} 条</span></div>
+
+      <div class="key-add">
+        <input v-model="keyName" placeholder="密钥名称，例如：生产环境签名密钥" spellcheck="false" @keyup.enter="saveCurrentKey" />
+        <button class="ghost-btn" type="button" @click="saveCurrentKey">保存当前密钥</button>
+      </div>
+      <div class="tip-row">
+        <span class="tip">保存的是上方「签名密钥 Secret」的当前值；仅写入本浏览器 localStorage，不会上传</span>
+        <span v-if="keyNotice" class="key-notice">{{ keyNotice }}</span>
+      </div>
+      <p v-if="keyError" class="err-text">{{ keyError }}</p>
+
+      <div v-if="keys.length" class="key-list">
+        <div v-for="item in keys" :key="item.id" class="key-item" :class="{ active: item.id === activeKeyId }">
+          <div class="key-main">
+            <span class="key-name">{{ item.name }}</span>
+            <span class="key-secret">{{ maskSecret(item.secret) }}</span>
+            <span class="key-time">{{ formatKeyTime(item.createdAt) }}</span>
+            <span v-if="item.id === activeKeyId" class="active-tag">使用中</span>
+          </div>
+          <div class="key-ops">
+            <button class="ghost-btn" type="button" @click="applyKey(item)">启用</button>
+            <button class="ghost-btn" type="button" @click="copyToken(item.secret)">复制</button>
+            <button class="ghost-btn danger" type="button" @click="deleteKey(item)">删除</button>
+          </div>
+        </div>
+      </div>
+      <div v-else class="empty-keys">暂无已保存的密钥，在上方输入名称后点击「保存当前密钥」</div>
+    </div>
   </section>
 </template>
 
@@ -273,4 +347,25 @@ onMounted(() => {
 .empty-hint { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 1.6rem 1rem; border: 1px dashed rgba(0,212,255,.15); border-radius: 8px; }
 .empty-icon { font-size: 1.6rem; color: rgba(0,212,255,.4); }
 .empty-hint p { font-size: .74rem; color: rgba(180,220,255,.4); text-align: center; line-height: 1.6; }
+
+/* ===== 密钥管理 ===== */
+.key-card { border-color: rgba(124,92,255,.25); }
+.key-add { display: flex; gap: .6rem; flex-wrap: wrap; }
+.key-add input { flex: 1; min-width: 220px; padding: .6rem .75rem; border-radius: 7px; border: 1px solid rgba(0,212,255,.22); background: rgba(4,9,24,.9); color: #d7ecff; font-family: inherit; font-size: .78rem; outline: none; transition: border-color .2s ease, box-shadow .2s ease; }
+.key-add input:focus { border-color: var(--tech-cyan); box-shadow: 0 0 0 2px rgba(34,247,201,.1); }
+.key-notice { font-size: .68rem; color: var(--tech-cyan); letter-spacing: .5px; }
+
+.key-list { display: flex; flex-direction: column; gap: .5rem; }
+.key-item { display: flex; align-items: center; justify-content: space-between; gap: .8rem; flex-wrap: wrap; padding: .6rem .8rem; border-radius: 7px; border: 1px solid rgba(0,212,255,.14); background: rgba(5,10,25,.55); transition: all .2s ease; }
+.key-item.active { border-color: rgba(34,247,201,.45); background: linear-gradient(90deg, rgba(34,247,201,.08), rgba(0,212,255,.05)); box-shadow: 0 0 14px rgba(34,247,201,.08); }
+.key-main { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; min-width: 0; }
+.key-name { font-size: .8rem; font-weight: 700; color: #e0f2fe; letter-spacing: .5px; }
+.key-secret { font-size: .72rem; color: var(--tech-purple); font-family: 'SF Mono','Consolas',monospace; }
+.key-time { font-size: .66rem; color: rgba(180,220,255,.38); font-family: 'SF Mono',monospace; }
+.active-tag { font-size: .62rem; padding: 1px 6px; border-radius: 3px; color: var(--tech-cyan); border: 1px solid rgba(34,247,201,.4); background: rgba(34,247,201,.08); }
+.key-ops { display: flex; gap: .4rem; }
+.key-ops .ghost-btn { padding: .3rem .65rem; font-size: .68rem; }
+.danger { color: #ff8fa3; border-color: rgba(255,93,122,.35); background: rgba(255,93,122,.06); }
+.danger:hover { color: #fff; border-color: #ff8fa3; background: rgba(255,93,122,.16); box-shadow: 0 0 10px rgba(255,93,122,.2); }
+.empty-keys { padding: 1rem; text-align: center; font-size: .74rem; color: rgba(180,220,255,.4); border: 1px dashed rgba(0,212,255,.15); border-radius: 7px; }
 </style>
