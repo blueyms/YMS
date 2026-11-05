@@ -3,8 +3,10 @@ import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import MarkdownRenderer from './components/MarkdownRenderer.vue';
 import Dashboard from './components/Dashboard.vue';
 import Architecture from './components/Architecture.vue';
+import JwtTool from './components/JwtTool.vue';
+import { DEMO_SECRET, signJwt } from './jwt';
 
-type PageType = 'markdown' | 'dashboard' | 'architecture';
+type PageType = 'markdown' | 'dashboard' | 'architecture' | 'jwt';
 
 interface DocItem { name: string; title: string; path: string; }
 interface Photon { id: number; x: number; y: number; size: number; delay: number; duration: number; hue: number; }
@@ -64,9 +66,19 @@ const submitLogin = () => {
     return;
   }
   isSubmitting.value = true;
-  setTimeout(() => {
-    currentUser.value = { name: loginForm.value.username.trim(), role: '良率工程师' };
-    localStorage.setItem('yms-user', JSON.stringify(currentUser.value));
+  const username = loginForm.value.username.trim();
+  setTimeout(async () => {
+    const user = { name: username, role: '良率工程师' };
+    currentUser.value = user;
+    localStorage.setItem('yms-user', JSON.stringify(user));
+    try {
+      const now = Math.floor(Date.now() / 1000);
+      const token = await signJwt(
+        { sub: user.name, name: user.name, role: user.role, iat: now, exp: now + 3600 },
+        DEMO_SECRET
+      );
+      localStorage.setItem('yms-token', token);
+    } catch { /* Web Crypto 不可用时忽略 */ }
     isSubmitting.value = false;
     showLogin.value = false;
     loginForm.value = { username: '', password: '' };
@@ -75,6 +87,7 @@ const submitLogin = () => {
 const logout = () => {
   currentUser.value = null;
   localStorage.removeItem('yms-user');
+  localStorage.removeItem('yms-token');
 };
 
 const loadPage = async (page: PageType | DocItem) => {
@@ -84,7 +97,7 @@ const loadPage = async (page: PageType | DocItem) => {
     tocItems.value = [];
     scrollProgress.value = 0;
     isLoading.value = false;
-    if (page === 'dashboard' || page === 'architecture') {
+    if (page === 'dashboard' || page === 'architecture' || page === 'jwt') {
       await nextTick();
       const panel = document.querySelector('.main-content') as HTMLElement | null;
       if (panel) panel.scrollTop = 0;
@@ -304,6 +317,9 @@ const onKeyDown = (e: KeyboardEvent) => {
         <li :class="{ active: currentPageType === 'architecture' }" @click="loadPage('architecture')">
           <span class="nav-icon-svg">⟁</span>技术架构拓扑
         </li>
+        <li :class="{ active: currentPageType === 'jwt' }" @click="loadPage('jwt')">
+          <span class="nav-icon-svg">⚿</span>JWT 密钥工具
+        </li>
       </ul>
       <div class="nav-title">▣ 文档导航</div>
       <ul class="nav-list">
@@ -342,6 +358,7 @@ const onKeyDown = (e: KeyboardEvent) => {
       </template>
       <div v-else-if="currentPageType === 'dashboard'" class="content-panel panel-wide"><Dashboard /></div>
       <div v-else-if="currentPageType === 'architecture'" class="content-panel panel-wide"><Architecture /></div>
+      <div v-else-if="currentPageType === 'jwt'" class="content-panel panel-wide"><JwtTool /></div>
     </main>
 
     <button class="back-top" :class="{ show: scrollProgress > 15 }" @click="scrollToTop" title="返回顶部">▲</button>
