@@ -6,9 +6,11 @@
  * 数据库：server/data/yms.db（Node 内置 node:sqlite）
  *
  * 接口：
- *   GET  /api/health        健康检查
- *   POST /api/submissions   表单提交，body: { clientId, kind, payload }
- *   GET  /api/submissions   最近提交记录，支持 ?limit=20
+ *   GET    /api/health                    健康检查
+ *   POST   /api/submissions               表单提交，body: { clientId, kind, payload }
+ *   GET    /api/submissions               提交列表，支持 ?limit=20 & ?offset=0
+ *   GET    /api/submissions/:id           单条详情
+ *   DELETE /api/submissions/:id           删除一条
  *
  * 可选鉴权：设置环境变量 YMS_API_TOKEN 后，业务接口需携带 Authorization: Bearer <token>
  * 内网穿透：本地启动后执行 cloudflared tunnel --url http://localhost:8787（或 ngrok http 8787），
@@ -47,7 +49,7 @@ const corsHeaders = (req) => {
   const allowed = ALLOW_ORIGINS.includes(origin) ? origin : '';
   return {
     ...(allowed ? { 'Access-Control-Allow-Origin': allowed, Vary: 'Origin' } : {}),
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type,Authorization',
     'Access-Control-Max-Age': '86400'
   };
@@ -136,17 +138,55 @@ const server = createServer(async (req, res) => {
 
   if (req.method === 'GET' && url.pathname === '/api/submissions') {
     const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 20)));
+    const offset = Math.max(0, Number(url.searchParams.get('offset') || 0));
+    const total = db.prepare('SELECT COUNT(*) AS n FROM submissions').get().n;
     const rows = db.prepare(
-      'SELECT id, client_id, kind, payload, created_at FROM submissions ORDER BY id DESC LIMIT ?'
-    ).all(limit).map(row => ({
+      'SELECT id, client_id, kind, payload, created_at FROM submissions ORDER BY id DESC LIMIT ? OFFSET ?'
+    ).all(limit, offset).map(row => ({
       id: row.id,
       clientId: row.client_id,
       kind: row.kind,
       payload: JSON.parse(row.payload),
       createdAt: row.created_at
     }));
-    sendJson(res, 200, { ok: true, total: rows.length, items: rows }, headers);
+    sendJson(res, 200, { ok: true, total, limit, offset, items: rows }, headers);
     return;
+  }
+
+  const detailMatch = url.pathname.match(/^\/api\/submissions\/(\d+)$/);
+  if (detailMatch) {
+    const id = Number(detailMatch[1]);
+
+    if (req.method === 'GET') {
+      const row = db.prepare(
+        'SELECT id, client_id, kind, payload, created_at FROM submissions WHERE id = ?'
+      ).get(id);
+      if (!row) {
+        sendJson(res, 404, { ok: false, error: '记录不存在' }, headers);
+        return;
+      }
+      sendJson(res, 200, {
+        ok: true,
+        item: {
+          id: row.id,
+          clientId: row.client_id,
+          kind: row.kind,
+          payload: JSON.parse(row.payload),
+          createdAt: row.created_at
+        }
+      }, headers);
+      return;
+    }
+
+    if (req.method === 'DELETE') {
+      const info = db.prepare('DELETE FROM submissions WHERE id = ?').run(id);
+      if (info.changes === 0) {
+        sendJson(res, 404, { ok: false, error: '记录不存在' }, headers);
+        return;
+      }
+      sendJson(res, 200, { ok: true, id }, headers);
+      return;
+    }
   }
 
   sendJson(res, 404, { ok: false, error: '接口不存在' }, headers);

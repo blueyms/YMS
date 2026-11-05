@@ -5,9 +5,10 @@ import Dashboard from './components/Dashboard.vue';
 import Architecture from './components/Architecture.vue';
 import JwtTool from './components/JwtTool.vue';
 import FormSubmit from './components/FormSubmit.vue';
+import SubmissionList from './components/SubmissionList.vue';
 import { DEMO_SECRET, signJwt } from './jwt';
 
-type PageType = 'markdown' | 'dashboard' | 'architecture' | 'jwt' | 'forms';
+type PageType = 'markdown' | 'dashboard' | 'architecture' | 'jwt' | 'forms' | 'records';
 
 interface DocItem { name: string; title: string; path: string; }
 interface Photon { id: number; x: number; y: number; size: number; delay: number; duration: number; hue: number; }
@@ -98,7 +99,7 @@ const loadPage = async (page: PageType | DocItem) => {
     tocItems.value = [];
     scrollProgress.value = 0;
     isLoading.value = false;
-    if (page === 'dashboard' || page === 'architecture' || page === 'jwt' || page === 'forms') {
+    if (page === 'dashboard' || page === 'architecture' || page === 'jwt' || page === 'forms' || page === 'records') {
       await nextTick();
       const panel = document.querySelector('.main-content') as HTMLElement | null;
       if (panel) panel.scrollTop = 0;
@@ -324,6 +325,9 @@ const onKeyDown = (e: KeyboardEvent) => {
         <li :class="{ active: currentPageType === 'forms' }" @click="loadPage('forms')">
           <span class="nav-icon-svg">▤</span>表单数据采集
         </li>
+        <li :class="{ active: currentPageType === 'records' }" @click="loadPage('records')">
+          <span class="nav-icon-svg">▦</span>提交记录列表
+        </li>
       </ul>
       <div class="nav-title">▣ 文档导航</div>
       <ul class="nav-list">
@@ -364,6 +368,7 @@ const onKeyDown = (e: KeyboardEvent) => {
       <div v-else-if="currentPageType === 'architecture'" class="content-panel panel-wide"><Architecture /></div>
       <div v-else-if="currentPageType === 'jwt'" class="content-panel panel-wide"><JwtTool /></div>
       <div v-else-if="currentPageType === 'forms'" class="content-panel panel-wide"><FormSubmit /></div>
+      <div v-else-if="currentPageType === 'records'" class="content-panel panel-wide"><SubmissionList /></div>
     </main>
 
     <button class="back-top" :class="{ show: scrollProgress > 15 }" @click="scrollToTop" title="返回顶部">▲</button>
