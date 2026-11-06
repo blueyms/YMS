@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+.vite
+.env
+.env.*
+!.env.example
+server/data/.run/
+server/data/yms.db*
+.DS_Store

@@ -17,6 +17,15 @@
 set -uo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# 自动加载 .env.local（如果存在且未显式设置）
+if [ -f "$ROOT_DIR/.env.local" ]; then
+  # shellcheck disable=SC1090
+  set -a
+  . "$ROOT_DIR/.env.local"
+  set +a
+fi
+
 RUN_DIR="$ROOT_DIR/server/data/.run"
 LOG_DIR="$RUN_DIR/logs"
 API_PID_FILE="$RUN_DIR/api.pid"
