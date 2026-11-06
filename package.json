@@ -8,6 +8,9 @@
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "api": "node server/index.mjs",
+    "stack:start": "bash scripts/local-stack.sh start",
+    "stack:stop": "bash scripts/local-stack.sh stop",
+    "stack:status": "bash scripts/local-stack.sh status",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
