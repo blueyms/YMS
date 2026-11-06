@@ -1,0 +1,15 @@
+(node:2326) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[yms-form-api] listening on http://0.0.0.0:8787
+[yms-form-api] sqlite: /workspace/server/data/yms.db
+[yms-form-api] allowed origins: https://blueyms.github.io, http://localhost:5173, http://127.0.0.1:5173
+(node:2421) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[yms-form-api] listening on http://0.0.0.0:8787
+[yms-form-api] sqlite: /workspace/server/data/yms.db
+[yms-form-api] allowed origins: https://blueyms.github.io, http://localhost:5173, http://127.0.0.1:5173
+(node:2536) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+[yms-form-api] listening on http://0.0.0.0:8787
+[yms-form-api] sqlite: /workspace/server/data/yms.db
+[yms-form-api] allowed origins: https://blueyms.github.io, http://localhost:5173, http://127.0.0.1:5173
